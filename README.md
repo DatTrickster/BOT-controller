@@ -15,7 +15,7 @@ React Native CLI: Install the React Native CLI by running npm install -g react-n
 
 
 
-- git clone https://github.com/your-username/react-native-robot-controller.git
+- git clone https://github.com/DatTrickster/BOT-controller.git
 - cd react-native-robot-controller
 - Install Dependencies
 ### Install the necessary npm packages:
