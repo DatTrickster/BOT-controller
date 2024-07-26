@@ -1,79 +1,61 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+### React Native Robot Controller
+This React Native application allows users to control a robot using either joystick or directional button controls. The app communicates with an ESP8266 microcontroller to send movement commands.
 
-# Getting Started
+### Features
+Switch between joystick and directional button control modes
+Send movement commands to the robot (forward, backward, left, right, stop)
+Display connection status and connection speed to the ESP8266
+Debug panel showing the current direction command
+Installation
+Prerequisites
+Node.js and npm: Make sure you have Node.js and npm installed. You can download them from nodejs.org.
+React Native CLI: Install the React Native CLI by running npm install -g react-native-cli.
+### Clone the Repository
+- Clone this repository to your local machine:
 
->**Note**: Make sure you have completed the [React Native - Environment Setup](https://reactnative.dev/docs/environment-setup) instructions till "Creating a new application" step, before proceeding.
 
-## Step 1: Start the Metro Server
 
-First, you will need to start **Metro**, the JavaScript _bundler_ that ships _with_ React Native.
+- git clone https://github.com/your-username/react-native-robot-controller.git
+- cd react-native-robot-controller
+- Install Dependencies
+### Install the necessary npm packages:
 
-To start Metro, run the following command from the _root_ of your React Native project:
+- npm install
+- Running the App
+- Connect your Android/iOS device or start an emulator, then run:
 
-```bash
-# using npm
-npm start
+- npx react-native run-android   # for Android
+- npx react-native run-ios       # for iOS
+### Usage
+- Connection Status: The app will attempt to connect to the ESP8266 at the specified IP address (http://192.168.4.1 by default). The - connection status and speed will be displayed at the top.
+- Switch Control Modes: Use the toggle switch to switch between joystick and directional button controls.
+- Joystick Control: When in joystick mode, use the joystick to control the robot's direction. The joystick can control the robot to move forward, backward, left, right, or stop.
+- Directional Button Control: When in directional button mode, use the buttons to control the robot's direction.
+- Debug Panel: The debug panel at the bottom of the screen displays the current direction command being sent to the robot.
+### Code Overview
+Control Modes
+The app provides two modes of controlling the robot:
 
-# OR using Yarn
-yarn start
-```
+## Joystick Control Mode:
+Users can use an on-screen joystick to control the robot's direction.
+The joystick supports four main directions: forward, backward, left, and right.
+When the joystick is released, a stop command is sent to the robot.
+- Directional Button Control Mode:
+Users can press on-screen buttons to control the robot's movement.
+- The available buttons are: forward, backward, left, right, and stop.
+Each button press sends the corresponding command to the robot.
+Connection Management
+- Connection Status: The app continuously checks the connection status to the ESP8266 and displays it. It also shows the connection speed in milliseconds.
+- Reconnection Attempts: If the connection fails, the app attempts to reconnect every 5 seconds.
+Sending Commands
+- Command Sending: The app sends movement commands to the ESP8266 based on user input (either from the joystick or buttons).
+Error Handling: If there is an error in sending commands, the app displays an alert to inform the user of a network error.
+Components
+- Joystick: A custom joystick component for controlling the robot's movement.
+App: The main app component managing the connection status, control modes, and sending commands to the ESP8266.
+Styles
+The app uses StyleSheet to style various components, such as the joystick container, buttons, and status panel.
 
-## Step 2: Start your Application
-
-Let Metro Bundler run in its _own_ terminal. Open a _new_ terminal from the _root_ of your React Native project. Run the following command to start your _Android_ or _iOS_ app:
-
-### For Android
-
-```bash
-# using npm
-npm run android
-
-# OR using Yarn
-yarn android
-```
-
-### For iOS
-
-```bash
-# using npm
-npm run ios
-
-# OR using Yarn
-yarn ios
-```
-
-If everything is set up _correctly_, you should see your new app running in your _Android Emulator_ or _iOS Simulator_ shortly provided you have set up your emulator/simulator correctly.
-
-This is one way to run your app — you can also run it directly from within Android Studio and Xcode respectively.
-
-## Step 3: Modifying your App
-
-Now that you have successfully run the app, let's modify it.
-
-1. Open `App.tsx` in your text editor of choice and edit some lines.
-2. For **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Developer Menu** (<kbd>Ctrl</kbd> + <kbd>M</kbd> (on Window and Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (on macOS)) to see your changes!
-
-   For **iOS**: Hit <kbd>Cmd ⌘</kbd> + <kbd>R</kbd> in your iOS Simulator to reload the app and see your changes!
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [Introduction to React Native](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you can't get this to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+### Troubleshooting
+- Connection Issues: If the app is unable to connect to the ESP8266, ensure the IP address is correct and the device is within range.
+- Debugging: Use the debug panel to see the current direction command being sent.

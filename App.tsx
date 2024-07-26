@@ -1,25 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, Animated, PanResponder, GestureResponderEvent, PanResponderGestureState, Alert, TouchableOpacity, Modal, FlatList } from 'react-native';
-import WifiManager from 'react-native-wifi-reborn';
-import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
+import { StyleSheet, View, Text, Alert, TouchableOpacity, Animated, PanResponder, GestureResponderEvent, PanResponderGestureState } from 'react-native';
+import axios from 'axios';
 
-// Joystick component that handles the position and movement of the joystick
-const Joystick: React.FC<{ size: number; onMove: (position: { x: number; y: number }) => void }> = ({ size, onMove }) => {
-  // Animated value to manage the joystick's position
+// Joystick component for controlling the robot
+const Joystick: React.FC<{ size: number; onMove: (direction: string) => void }> = ({ size, onMove }) => {
   const [position] = useState(new Animated.ValueXY({ x: 0, y: 0 }));
 
-  // PanResponder to handle touch gestures for joystick movement
   const panResponder = PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onPanResponderMove: (_: GestureResponderEvent, gestureState: PanResponderGestureState) => {
       const { dx, dy } = gestureState;
+      const direction = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'backwards' : 'forwards');
       position.setValue({ x: dx, y: dy });
-      onMove({ x: dx, y: dy });
+      onMove(direction);
     },
     onPanResponderRelease: () => {
-      // Reset joystick position on release
       position.setValue({ x: 0, y: 0 });
-      onMove({ x: 0, y: 0 });
+      onMove('stop');
     },
   });
 
@@ -27,8 +24,8 @@ const Joystick: React.FC<{ size: number; onMove: (position: { x: number; y: numb
     <View style={[styles.joystickContainer, { width: size, height: size }]}>
       <Animated.View
         style={[styles.joystick, {
-          width: size / 3,
-          height: size / 3,
+          width: size / 2.5,
+          height: size / 2.5,
           transform: position.getTranslateTransform(),
         }]}
         {...panResponder.panHandlers}
@@ -37,112 +34,65 @@ const Joystick: React.FC<{ size: number; onMove: (position: { x: number; y: numb
   );
 };
 
-// Direction controls component for simpler directional input
-const DirectionControls: React.FC<{ onDirectionChange: (direction: string) => void }> = ({ onDirectionChange }) => {
-  return (
-    <View style={styles.directionControls}>
-      <TouchableOpacity style={styles.directionButton} onPress={() => onDirectionChange('Back')}>
-        <Text style={styles.directionText}>Back</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.directionButton} onPress={() => onDirectionChange('Front')}>
-        <Text style={styles.directionText}>Front</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.directionButton} onPress={() => onDirectionChange('Left')}>
-        <Text style={styles.directionText}>Left</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.directionButton} onPress={() => onDirectionChange('Right')}>
-        <Text style={styles.directionText}>Right</Text>
-      </TouchableOpacity>
-    </View>
-  );
-};
-
+// Main app component
 const App: React.FC = () => {
-  // State variables
-  const [direction, setDirection] = useState<string>(''); // Current direction for direction controls
-  const [position, setPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 }); // Joystick position
-  const [connectionStatus, setConnectionStatus] = useState<string>('Connecting...'); // Connection status message
-  const [connectionSpeed, setConnectionSpeed] = useState<number>(0); // Connection speed in milliseconds
-  const [espIP, setEspIP] = useState<string>('http://192.168.4.1'); // Default IP address for ESP8266
-  const [isSidebarVisible, setIsSidebarVisible] = useState<boolean>(false); // State for sidebar visibility
-  const [networks, setNetworks] = useState<string[]>([]); // List of available Wi-Fi networks
-  const [controlMode, setControlMode] = useState<'joystick' | 'direction'>('joystick'); // Current control mode
+  const [direction, setDirection] = useState<string>('');
+  const [connectionStatus, setConnectionStatus] = useState<string>('Connecting...');
+  const [connectionSpeed, setConnectionSpeed] = useState<number>(0); // in milliseconds
+  const [espIP, setEspIP] = useState<string>('http://192.168.4.1'); // Default IP for AP mode
+  const [controlMode, setControlMode] = useState<'joystick' | 'direction'>('direction');
 
   useEffect(() => {
-    requestLocationPermission();
-  }, []);
+    const checkConnection = () => {
+      const startConnectionTimer = Date.now();
+      axios.get(espIP)
+        .then(response => {
+          setConnectionStatus('Connected');
+          setConnectionSpeed(Date.now() - startConnectionTimer); // Calculate connection speed
+        })
+        .catch(error => {
+          setConnectionStatus('Failed to Connect');
+          console.error('Connection Error:', error);
+        });
+    };
 
-  // Request location permission for scanning Wi-Fi networks
-  const requestLocationPermission = async () => {
-    try {
-      const result = await check(PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION);
-      if (result === RESULTS.DENIED) {
-        const requestResult = await request(PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION);
-        if (requestResult === RESULTS.GRANTED) {
-          fetchAvailableNetworks();
-        } else {
-          Alert.alert('Permission Denied', 'Location permission is required to scan Wi-Fi networks.');
-        }
-      } else if (result === RESULTS.GRANTED) {
-        fetchAvailableNetworks();
-      } else {
-        Alert.alert('Permission Status', 'Location permission status is unknown.');
+    checkConnection();
+    const interval = setInterval(() => {
+      if (connectionStatus === 'Connected') {
+        checkConnection();
       }
-    } catch (error) {
-      console.error('Failed to request location permission:', error);
-      Alert.alert('Error', 'Failed to request location permission.');
-    }
-  };
+    }, 5000); // Check connection every 5 seconds
 
-  // Fetch available Wi-Fi networks and remove duplicates
-  const fetchAvailableNetworks = async () => {
-    try {
-      const wifiList = await WifiManager.loadWifiList();
-      const uniqueNetworks = Array.from(new Set(wifiList.map((wifi: any) => wifi.SSID)));
-      setNetworks(uniqueNetworks);
-    } catch (error) {
-      console.error('Failed to load Wi-Fi networks:', error);
-      Alert.alert('Error', 'Failed to load Wi-Fi networks');
-    }
-  };
+    return () => clearInterval(interval);
+  }, [espIP, connectionStatus]);
 
-  // Handle joystick movement and send position to ESP8266
-  const handleMove = (newPosition: { x: number; y: number }) => {
-    if (newPosition.x > 50) setDirection('Right');
-    else if (newPosition.x < -50) setDirection('Left');
-    else if (newPosition.y > 50) setDirection('Down');
-    else if (newPosition.y < -50) setDirection('Up');
-    else setDirection('');
-
-    setPosition(newPosition);
-    sendPositionToESP(newPosition);
-  };
-
-  // Handle direction control button presses
   const handleDirectionChange = (newDirection: string) => {
     setDirection(newDirection);
-    sendPositionToESP({ x: 0, y: 0 }); // Adjust position as needed
+    sendCommandToESP(newDirection); // Send command based on button press
   };
 
-  // Send position to ESP8266 server
-  const sendPositionToESP = (position: { x: number; y: number }) => {
-    fetch(`${espIP}/?x=${position.x.toFixed(2)}&y=${position.y.toFixed(2)}`)
-      .then(response => response.text())
-      .then(data => console.log('Position response:', data))
-      .catch(error => {
-        console.error('Error sending position:', error);
-        Alert.alert('Network Error', 'Unable to connect to ESP8266. Please check your connection.');
-      });
+  const handleJoystickMove = (newDirection: string) => {
+    setDirection(newDirection);
+    sendCommandToESP(newDirection); // Send command based on joystick movement
+  };
+
+  const sendCommandToESP = async (command: string) => {
+    try {
+      const response = await axios.get(`${espIP}/${command}`);
+      console.log('Command response:', response.data);
+    } catch (error) {
+      console.error('Error sending command:', error);
+      Alert.alert('Network Error', 'Unable to connect to ESP8266. Please check your connection.');
+    }
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.statusPanel}>
-        <Text style={styles.statusText}>Connection Status: {connectionStatus}</Text>
+        <Text style={[styles.statusText, connectionStatus === 'Connected' && styles.connectedStatusText]}>
+          Connection Status: {connectionStatus}
+        </Text>
         <Text style={styles.statusText}>Connection Speed: {connectionSpeed} ms</Text>
-        <TouchableOpacity onPress={() => setIsSidebarVisible(true)}>
-          <Text style={styles.statusText}>Show Networks</Text>
-        </TouchableOpacity>
         <TouchableOpacity
           style={styles.toggleSwitch}
           onPress={() => setControlMode(controlMode === 'joystick' ? 'direction' : 'joystick')}
@@ -150,40 +100,36 @@ const App: React.FC = () => {
           <Text style={styles.toggleSwitchText}>{controlMode === 'joystick' ? 'Switch to Direction Controls' : 'Switch to Joystick Controls'}</Text>
         </TouchableOpacity>
       </View>
-      <Text style={styles.title}>Control</Text>
-      {controlMode === 'joystick' ? (
-        <Joystick size={200} onMove={handleMove} />
+      <Text style={styles.title}>{controlMode === 'joystick' ? 'Joystick Control' : 'Direction Control'}</Text>
+      {controlMode === 'direction' ? (
+        <View style={styles.directionControls}>
+          <TouchableOpacity style={styles.directionButton} onPress={() => handleDirectionChange('backward')}>
+            <Text style={styles.directionText}>Back</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.directionButton} onPress={() => handleDirectionChange('forward')}>
+            <Text style={styles.directionText}>Front</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.directionButton} onPress={() => handleDirectionChange('left')}>
+            <Text style={styles.directionText}>Left</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.directionButton} onPress={() => handleDirectionChange('right')}>
+            <Text style={styles.directionText}>Right</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.directionButton} onPress={() => handleDirectionChange('stop')}>
+            <Text style={styles.directionText}>Stop</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
-        <DirectionControls onDirectionChange={handleDirectionChange} />
+        <Joystick size={200} onMove={handleJoystickMove} />
       )}
       <View style={styles.debugPanel}>
         <Text style={styles.debugText}>Direction: {direction}</Text>
-        <Text style={styles.debugText}>X Position: {position.x.toFixed(2)}</Text>
-        <Text style={styles.debugText}>Y Position: {position.y.toFixed(2)}</Text>
       </View>
-      <Modal
-        visible={isSidebarVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setIsSidebarVisible(false)}
-      >
-        <View style={styles.sidebar}>
-          <FlatList
-            data={networks}
-            keyExtractor={(item) => item}
-            renderItem={({ item }) => (
-              <View style={styles.networkItem}>
-                <Text style={styles.networkText}>{item}</Text>
-              </View>
-            )}
-          />
-        </View>
-      </Modal>
     </View>
   );
 };
 
-// Styles for various components
+// Styles for the app components
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -194,17 +140,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     marginBottom: 20,
-  },
-  joystickContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 100,
-    backgroundColor: '#ddd',
-    marginBottom: 20,
-  },
-  joystick: {
-    borderRadius: 40,
-    backgroundColor: '#666',
   },
   statusPanel: {
     position: 'absolute',
@@ -222,6 +157,9 @@ const styles = StyleSheet.create({
     marginBottom: 5,
     color: 'black',
   },
+  connectedStatusText: {
+    color: 'green',
+  },
   toggleSwitch: {
     marginTop: 10,
     padding: 10,
@@ -229,6 +167,25 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
   toggleSwitchText: {
+    color: '#fff',
+    fontSize: 16,
+  },
+  directionControls: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    width: '100%',
+    padding: 20,
+  },
+  directionButton: {
+    backgroundColor: '#007bff',
+    padding: 15,
+    margin: 5,
+    borderRadius: 5,
+    width: 100,
+    alignItems: 'center',
+  },
+  directionText: {
     color: '#fff',
     fontSize: 16,
   },
@@ -243,43 +200,19 @@ const styles = StyleSheet.create({
   },
   debugText: {
     fontSize: 16,
-    marginBottom: 5,
     color: 'black',
+    marginBottom: 5,
   },
-  sidebar: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  joystickContainer: {
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    borderRadius: 100,
+    backgroundColor: '#ddd',
+    marginBottom: 20,
   },
-  networkItem: {
-    backgroundColor: '#fff',
-    padding: 10,
-    marginBottom: 5,
-    borderRadius: 5,
-    width: '100%',
-    alignItems: 'center',
-  },
-  networkText: {
-    fontSize: 18,
-    color: 'black',
-  },
-  directionControls: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-    padding: 20,
-  },
-  directionButton: {
-    backgroundColor: '#007bff',
-    padding: 15,
-    margin: 5,
-    borderRadius: 5,
-  },
-  directionText: {
-    color: '#fff',
-    fontSize: 16,
+  joystick: {
+    borderRadius: 40,
+    backgroundColor: '#666',
   },
 });
 
